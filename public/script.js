@@ -1,4 +1,4 @@
-// File: public/script.js (Final Error-Handling Version)
+// File: public/script.js (Final-final Error Handling Version)
 
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('file-upload');
@@ -28,39 +28,45 @@ document.addEventListener('DOMContentLoaded', () => {
         resultText.classList.add('loading');
 
         try {
-            const response = await fetch('/api/narrate', {
-                method: 'POST',
-                headers: { 'Content-Type': file.type },
-                body: file,
-            });
+            const reader = new FileReader();
+            reader.readAsDataURL(file); // Read the file as a base64 string
 
-            // If the server response is not OK (e.g., 500 error), get the error message from the body
-            if (!response.ok) {
-                // Try to parse the error message from the server's JSON response
-                const errorData = await response.json().catch(() => {
-                    // If the response isn't JSON, create a generic error
-                    return { error: `Server returned a non-JSON error: ${response.status} ${response.statusText}` };
+            reader.onload = async () => {
+                const imageBase64 = reader.result;
+
+                const response = await fetch('/api/narrate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageBase64 }),
                 });
-                // Throw an error that will be caught by the catch block below
-                throw new Error(errorData.error || `An unknown server error occurred.`);
-            }
 
-            const data = await response.json();
-            resultText.classList.remove('loading');
+                // If the server response is not OK (e.g., 500 error), get the raw text of the error
+                if (!response.ok) {
+                    const errorText = await response.text(); // Get the raw error text from the server
+                    // Throw an error that contains this raw text. This is the most robust way.
+                    throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+                }
 
-            if (data.caption) {
-                const caption = data.caption.charAt(0).toUpperCase() + data.caption.slice(1);
-                resultText.textContent = caption;
-            } else {
-                throw new Error("Received a valid response, but no caption was found.");
-            }
+                const data = await response.json();
+                resultText.classList.remove('loading');
+
+                if (data.caption) {
+                    const caption = data.caption.charAt(0).toUpperCase() + data.caption.slice(1);
+                    resultText.textContent = caption;
+                } else {
+                    throw new Error("Invalid successful response from server.");
+                }
+            };
+            
+            reader.onerror = () => {
+                throw new Error('Failed to read the local file.');
+            };
 
         } catch (error) {
-            console.error("Error during analysis:", error); // This logs the full error to the browser console for debugging
+            console.error("Error during analysis:", error); // Log the full error to the browser console for debugging
             resultText.classList.remove('loading');
             
-            // --- NEW, MORE ROBUST ERROR DISPLAY ---
-            // Display the specific error message on the screen
+            // Display the specific error message directly on the screen
             resultText.textContent = `Error: ${error.message}`;
         }
     });
