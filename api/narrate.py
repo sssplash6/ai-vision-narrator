@@ -1,72 +1,50 @@
-# File: api/narrate.py (Final Debugging & Fix Version)
+# File: api/narrate.py (Simplest Possible Version)
 
-import os
+from http.server import BaseHTTPRequestHandler
 import json
+import os
 import requests
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-import logging
 
-# Set up a logger to capture all output
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            # 1. Get API Key and prepare URL
+            API_KEY = os.environ.get('GOOGLE_API_KEY')
+            if not API_KEY:
+                self.send_error(500, "Server configuration error: API key missing.")
+                return
+            
+            GOOGLE_VISION_API_URL = f"https://vision.googleapis.com/v1/images:annotate?key={API_KEY}"
 
-app = FastAPI()
+            # 2. Read and parse incoming data
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            body = json.loads(post_data)
+            image_b64 = body['image'].split(',')[1]
 
-@app.post("/")
-async def narrate_image(request: Request):
-    logger.info("--- API function starting ---")
-    try:
-        # 1. Check for API Key
-        API_KEY = os.environ.get('GOOGLE_API_KEY')
-        if not API_KEY:
-            logger.error("!!! CRITICAL: GOOGLE_API_KEY not found.")
-            return JSONResponse(status_code=500, content={"error": "Server is not configured."})
-        
-        logger.info("API Key found.")
-        GOOGLE_VISION_API_URL = f"https://vision.googleapis.com/v1/images:annotate?key={API_KEY}"
+            # 3. Prepare and send request to Google
+            google_request = {
+                "requests": [{
+                    "image": {"content": image_b64},
+                    "features": [{"type": "LABEL_DETECTION", "maxResults": 10}]
+                }]
+            }
+            
+            response = requests.post(GOOGLE_VISION_API_URL, json=google_request, timeout=10)
+            response.raise_for_status()
+            google_response = response.json()
 
-        # 2. Read and parse incoming data
-        body = await request.json()
-        image_b64 = body['image'].split(',')[1]
-        logger.info("Successfully parsed image data from request.")
+            # 4. Extract and return labels
+            labels = google_response['responses'][0].get('labelAnnotations', [])
+            descriptions = [label['description'] for label in labels]
 
-        # 3. Prepare payload for Google Vision API
-        google_request = {
-            "requests": [{
-                "image": {"content": image_b64},
-                "features": [{"type": "LABEL_DETECTION", "maxResults": 10}]
-            }]
-        }
+            # 5. Send successful response
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"labels": descriptions}).encode('utf-8'))
 
-        # 4. Make the request to Google Vision API
-        logger.info("Sending request to Google Vision API...")
-        response = requests.post(GOOGLE_VISION_API_URL, json=google_request, timeout=10)
-        
-        logger.info(f"Google API Response Status: {response.status_code}")
-        
-        # This will raise an error if the status code is 4xx or 5xx
-        response.raise_for_status()
-        
-        google_response = response.json()
-        logger.info("Successfully received and parsed JSON response from Google.")
-
-        # 5. Extract labels and return response
-        labels = google_response.get('responses', [])[0].get('labelAnnotations', [])
-        descriptions = [label['description'] for label in labels]
-        logger.info(f"Extracted labels: {descriptions}")
-
-        return JSONResponse(status_code=200, content={"labels": descriptions})
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"!!! HTTP Request ERROR: {e}")
-        # Log the full response body if it exists, as it often contains the error message from Google
-        if e.response is not None:
-            logger.error(f"Google's Error Response: {e.response.text}")
-        return JSONResponse(status_code=500, content={"error": f"Failed to communicate with Google Vision API: {e}"})
-
-    except Exception as e:
-        # This is a catch-all for any other error (e.g., parsing, key errors)
-        logger.error(f"!!! An unexpected error occurred: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"error": "An internal server error occurred."})
-
+        except Exception as e:
+            # If anything fails, send a detailed error
+            self.send_error(500, f"Internal Server Error: {e}")
+        return
