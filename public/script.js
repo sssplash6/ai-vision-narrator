@@ -1,4 +1,4 @@
-// File: public/script.js
+// File: public/script.js (Final Error-Handling Version)
 
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('file-upload');
@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.getElementById('checkbox');
     const body = document.body;
 
+    // --- Dark Mode Logic ---
     const applyTheme = (theme) => {
         body.dataset.theme = theme;
         themeToggle.checked = theme === 'dark';
@@ -17,54 +18,50 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(savedTheme || (prefersDark ? 'dark' : 'light'));
     themeToggle.addEventListener('change', () => applyTheme(themeToggle.checked ? 'dark' : 'light'));
 
-    fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (!file) {
-            return;
-        }
+    // --- File Upload and AI Analysis Logic ---
+    fileInput.addEventListener('change', async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
 
         fileNameSpan.textContent = file.name;
         resultText.textContent = '';
         resultText.classList.add('loading');
 
-        const reader = new FileReader();
-        reader.readAsDataURL(file); // This reads the file as a base64 string
+        try {
+            const response = await fetch('/api/narrate', {
+                method: 'POST',
+                headers: { 'Content-Type': file.type },
+                body: file,
+            });
 
-        reader.onload = async () => {
-            const imageBase64 = reader.result;
-
-            try {
-                const response = await fetch('/api/narrate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imageBase64 }), // Send as JSON
+            // If the server response is not OK (e.g., 500 error), get the error message from the body
+            if (!response.ok) {
+                // Try to parse the error message from the server's JSON response
+                const errorData = await response.json().catch(() => {
+                    // If the response isn't JSON, create a generic error
+                    return { error: `Server returned a non-JSON error: ${response.status} ${response.statusText}` };
                 });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: `Server error: ${response.status}` }));
-                    throw new Error(errorData.error);
-                }
-
-                const data = await response.json();
-                resultText.classList.remove('loading');
-
-                if (data.caption) {
-                    const caption = data.caption.charAt(0).toUpperCase() + data.caption.slice(1);
-                    resultText.textContent = caption;
-                } else {
-                    throw new Error("Invalid response from server.");
-                }
-
-            } catch (error) {
-                console.error("Error during analysis:", error);
-                resultText.classList.remove('loading');
-                resultText.textContent = `Error: ${error.message}`;
+                // Throw an error that will be caught by the catch block below
+                throw new Error(errorData.error || `An unknown server error occurred.`);
             }
-        };
-        
-        reader.onerror = () => {
+
+            const data = await response.json();
             resultText.classList.remove('loading');
-            resultText.textContent = 'Error reading the file.';
-        };
+
+            if (data.caption) {
+                const caption = data.caption.charAt(0).toUpperCase() + data.caption.slice(1);
+                resultText.textContent = caption;
+            } else {
+                throw new Error("Received a valid response, but no caption was found.");
+            }
+
+        } catch (error) {
+            console.error("Error during analysis:", error); // This logs the full error to the browser console for debugging
+            resultText.classList.remove('loading');
+            
+            // --- NEW, MORE ROBUST ERROR DISPLAY ---
+            // Display the specific error message on the screen
+            resultText.textContent = `Error: ${error.message}`;
+        }
     });
 });
