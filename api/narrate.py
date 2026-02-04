@@ -1,72 +1,56 @@
-# File: api/narrate.py
+# File: api/narrate.py (Final FastAPI Version)
 
-from http.server import BaseHTTPRequestHandler
-import json
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 import os
 import requests
 
-# This is the main function Vercel's Python runtime will execute.
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        # 1. Get the API Key and prepare the Google Vision API URL
-        # os.environ.get() securely reads the environment variable we set in the Vercel dashboard.
-        API_KEY = os.environ.get('GOOGLE_API_KEY')
-        if not API_KEY:
-            self.send_response(500)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "API key is not configured."}).encode('utf-8'))
-            return
-            
-        GOOGLE_VISION_API_URL = f"https://vision.googleapis.com/v1/images:annotate?key={API_KEY}"
+# Vercel will automatically find and run this 'app' object.
+app = FastAPI()
 
-        # 2. Read the image data sent from the frontend
-        try:
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            # The frontend will send a JSON payload like: {"image": "data:image/jpeg;base64,..."}
-            body = json.loads(post_data)
-            # We need to strip the "data:image/jpeg;base64," part to get the raw image data
-            image_b64 = body['image'].split(',')[1]
-        except Exception:
-            self.send_response(400)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "Invalid image data received."}).encode('utf-8'))
-            return
+# This decorator tells FastAPI to handle POST requests that are routed to this file.
+# Since the file is named narrate.py, the full URL becomes /api/narrate
+@app.post("/")
+async def narrate_image(request: Request):
+    # 1. Securely get the API Key from Vercel's environment variables
+    API_KEY = os.environ.get('GOOGLE_API_KEY')
+    if not API_KEY:
+        return JSONResponse(status_code=500, content={"error": "API key is not configured."})
+    
+    GOOGLE_VISION_API_URL = f"https://vision.googleapis.com/v1/images:annotate?key={API_KEY}"
 
-        # 3. Construct the request payload for Google's AI model
-        google_request = {
-            "requests": [{
-                "image": {"content": image_b64},
-                "features": [{"type": "LABEL_DETECTION", "maxResults": 10}]
-            }]
-        }
+    # 2. Read the image data sent from the frontend
+    try:
+        body = await request.json()
+        # The frontend sends a string like "data:image/jpeg;base64,..."
+        # We need to get only the part after the comma.
+        image_b64 = body['image'].split(',')[1]
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid image data received."})
 
-        # 4. Call the Google Vision AI API
-        try:
-            response = requests.post(GOOGLE_VISION_API_URL, json=google_request)
-            response.raise_for_status() # This will raise an error if the request fails
-            google_response = response.json()
-            
-            # 5. Process the AI's response
-            if 'responses' not in google_response or not google_response['responses']:
-                 raise ValueError("Invalid response from Google Vision API")
+    # 3. Construct the request payload for Google's AI model
+    google_request = {
+        "requests": [{
+            "image": {"content": image_b64},
+            "features": [{"type": "LABEL_DETECTION", "maxResults": 10}]
+        }]
+    }
 
-            # Extract the text descriptions of the labels found in the image
-            labels = google_response['responses'][0].get('labelAnnotations', [])
-            descriptions = [label['description'] for label in labels]
+    # 4. Call the Google Vision AI API
+    try:
+        response = requests.post(GOOGLE_VISION_API_URL, json=google_request)
+        response.raise_for_status() # This will raise an error for bad responses (like 4xx or 5xx)
+        google_response = response.json()
+        
+        if 'responses' not in google_response or not google_response['responses']:
+            raise ValueError("Invalid response structure from Google Vision API")
 
-            # 6. Send the clean list of labels back to our frontend
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"labels": descriptions}).encode('utf-8'))
+        # 5. Process the AI's response and send it back to our frontend
+        labels = google_response['responses'][0].get('labelAnnotations', [])
+        descriptions = [label['description'] for label in labels]
+        
+        return JSONResponse(status_code=200, content={"labels": descriptions})
 
-        except Exception as e:
-            # Send a generic error if anything goes wrong
-            self.send_response(500)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
-            return
+    except Exception as e:
+        # If anything goes wrong, return a server error with the details
+        return JSONResponse(status_code=500, content={"error": str(e)})
