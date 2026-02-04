@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "src": "/api/narrate.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/narrate",
+      "destination": "/api/narrate.py"
+    }
+  ]
+}
