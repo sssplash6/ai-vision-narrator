@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Vision Narrator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Dark Mode Toggle -->
+    <div class="theme-switch-container">
+        <label class="theme-switch" for="checkbox">
+            <input type="checkbox" id="checkbox" />
+            <div class="slider round"></div>
+        </label>
+    </div>
+
+    <div class="container">
+        <!-- Visually hidden but accessible to screen readers -->
+        <h1 class="visually-hidden">AI Image Narrator</h1>
+
+        <div id="upload-area">
+            <img src="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png" alt="Upload Icon" width="60"/>
+            <h2>Describe What's in an Image</h2>
+            <p>Upload a file and let AI describe it for you. Built for accessibility.</p>
+            
+            <!-- This label makes the whole area clickable and accessible -->
+            <label for="file-upload" class="custom-file-upload">
+                Choose Image
+            </label>
+            <input type="file" id="file-upload" accept="image/*" />
+            <span id="file-name">No file chosen</span>
+        </div>
+
+        <div id="result-area">
+            <h2 class="result-title">Analysis</h2>
+            <!-- This 'aria-live' attribute is the key for dictation. Screen readers will automatically read any text that appears here. -->
+            <div id="result-text" class="result-text" aria-live="polite">
+                The description of your image will appear here.
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+/* Using CSS variables for easy theming */
+:root {
+    --bg-color: #f5f5f7;
+    --card-bg-color: #ffffff;
+    --text-primary: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --border-color: #e5e5e5;
+    --accent-color: #007aff;
+    --shadow-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] {
+    --bg-color: #161617;
+    --card-bg-color: #1d1d1f;
+    --text-primary: #f5f5f7;
+    --text-secondary: #8d8d92;
+    --border-color: #3a3a3c;
+    --accent-color: #0a84ff;
+    --shadow-color: rgba(0, 0, 0, 0.25);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    transition: background-color 0.3s ease;
+}
+
+.container {
+    background-color: var(--card-bg-color);
+    padding: 40px 50px;
+    border-radius: 20px;
+    box-shadow: 0 12px 50px var(--shadow-color);
+    border: 1px solid var(--border-color);
+    max-width: 550px;
+    width: 100%;
+    text-align: center;
+}
+
+h2 {
+    font-size: 1.8em;
+    font-weight: 600;
+    margin: 15px 0 10px 0;
+}
+
+p {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 30px;
+}
+
+/* Accessible file upload styling */
+input[type="file"] {
+    display: none; /* Hide the default ugly input */
+}
+
+.custom-file-upload {
+    display: inline-block;
+    background-color: var(--accent-color);
+    color: white;
+    padding: 12px 25px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.custom-file-upload:hover {
+    background-color: color-mix(in srgb, var(--accent-color) 90%, black);
+}
+
+#file-name {
+    display: block;
+    margin-top: 15px;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+/* Result Area Styling */
+#result-area {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 1px solid var(--border-color);
+}
+
+.result-title {
+    font-size: 1.2em;
+    text-align: left;
+    margin-bottom: 10px;
+}
+
+.result-text {
+    text-align: left;
+    font-size: 1.1em;
+    line-height: 1.6;
+    min-height: 50px;
+}
+
+.result-text.loading::after {
+    content: 'Analyzing...';
+    color: var(--text-secondary);
+}
+
+/* Utility for screen readers */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Dark mode toggle styles (same as before) */
+.theme-switch-container{position:absolute;top:20px;right:20px}.theme-switch{display:inline-block;height:24px;position:relative;width:50px}.theme-switch input{display:none}.slider{background-color:#ccc;bottom:0;cursor:pointer;left:0;position:absolute;right:0;top:0;transition:.4s}.slider:before{background-color:#fff;bottom:2px;content:"";height:20px;left:2px;position:absolute;transition:.4s;width:20px}input:checked+.slider{background-color:var(--accent-color)}input:checked+.slider:before{transform:translateX(26px)}.slider.round{border-radius:34px}.slider.round:before{border-radius:50%}
