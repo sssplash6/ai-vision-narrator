@@ -1,4 +1,4 @@
-// File: public/script.js
+// File: public/script.js (Final Version for Hugging Face)
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- UI Elements ---
@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     themeToggle.addEventListener('change', () => applyTheme(themeToggle.checked ? 'dark' : 'light'));
 
     // --- File Upload and AI Analysis Logic ---
-    fileInput.addEventListener('change', () => {
+    fileInput.addEventListener('change', async () => {
         const file = fileInput.files[0];
         if (!file) return;
 
@@ -28,44 +28,39 @@ document.addEventListener('DOMContentLoaded', () => {
         resultText.textContent = ''; // Clear previous results
         resultText.classList.add('loading'); // Show "Analyzing..." text
 
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
+        try {
+            // This new version sends the raw image file directly. It's more efficient
+            // and required by the Hugging Face Inference API.
+            const response = await fetch('/api/narrate', {
+                method: 'POST',
+                headers: { 'Content-Type': file.type }, // Send the actual image mime type
+                body: file, // The raw file object is the body
+            });
 
-        reader.onload = async () => {
-            const imageBase64 = reader.result;
-
-            try {
-                const response = await fetch('/api/narrate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imageBase64 }),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                resultText.classList.remove('loading');
-
-                if (data.labels && data.labels.length > 0) {
-                    // Format the labels into a natural sentence for dictation
-                    const formattedText = `This image appears to contain: ${data.labels.join(', ')}.`;
-                    resultText.textContent = formattedText;
-                } else {
-                    resultText.textContent = "I'm sorry, I couldn't identify any objects in this image.";
-                }
-
-            } catch (error) {
-                console.error("Error:", error);
-                resultText.classList.remove('loading');
-                resultText.textContent = "An error occurred during analysis. Please try again.";
+            if (!response.ok) {
+                // If the server returns an error (like 500), this will throw an error
+                throw new Error(`Server error: ${response.status} ${response.statusText}`);
             }
-        };
 
-        reader.onerror = () => {
+            const data = await response.json();
             resultText.classList.remove('loading');
-            resultText.textContent = 'There was an error reading the file.';
-        };
+
+            if (data.caption) {
+                // The AI now returns a full sentence caption.
+                // We'll make the first letter uppercase for a nicer presentation.
+                const caption = data.caption.charAt(0).toUpperCase() + data.caption.slice(1);
+                resultText.textContent = caption;
+            } else if (data.error) {
+                // Display specific errors from the backend if available
+                resultText.textContent = `Error: ${data.error}`;
+            } else {
+                resultText.textContent = "I'm sorry, I couldn't generate a description for this image.";
+            }
+
+        } catch (error) {
+            console.error("Error during fetch:", error);
+            resultText.classList.remove('loading');
+            resultText.textContent = "A client-side error occurred. Please check the console.";
+        }
     });
 });
